@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kural Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap" style="max-width:1100px">
+  <header>
+    <div><div class="brand"><h1>Kural</h1><span>Admin</span></div><p class="tag">Helpline analytics, knowledge gaps, callback tickets and knowledge base</p></div>
+    <div class="row"><a href="/" class="pill">← Helpline</a><button class="btn ghost" id="logout">Sign out</button></div>
+  </header>
+
+  <section class="card" id="login">
+    <h2>Admin key</h2>
+    <form class="row" id="lform"><input type="password" id="key" placeholder="X-Admin-Key" style="flex:1"><button class="btn">Open dashboard</button></form>
+    <p class="small" id="lerr"></p>
+  </section>
+
+  <div id="dash" class="hidden">
+    <div class="row" style="margin-bottom:12px">
+      <label>Window</label>
+      <select id="days" style="width:auto"><option value="1">24 h</option><option value="7" selected>7 days</option><option value="30">30 days</option></select>
+      <button class="btn ghost" id="refresh">Refresh</button><span class="small" id="updated"></span>
+    </div>
+    <div class="grid" id="kpis"></div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:12px">
+      <section class="card"><h2>Calls per day</h2><div class="bars" id="daily"></div><div style="height:18px"></div></section>
+      <section class="card"><h2>Programme credits</h2><div id="credits"></div>
+        <h2 style="margin-top:16px">Languages & channels</h2><div id="langs" class="small"></div></section>
+    </div>
+
+    <section class="card" style="margin-top:12px"><h2>Knowledge gaps (questions Kural could not answer)</h2>
+      <div class="overflow"><table id="gaps"></table></div></section>
+
+    <section class="card" style="margin-top:12px"><h2>Open callback tickets</h2>
+      <div class="overflow"><table id="tickets"></table></div></section>
+
+    <section class="card" style="margin-top:12px"><h2>Add to knowledge base</h2>
+      <form id="kb" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+        <div><label>Title</label><input type="text" name="title" required></div>
+        <div><label>Official source URL</label><input type="url" name="source_url"></div>
+        <div><label>Category</label><input type="text" name="category" value="general"></div>
+        <div><label>Aliases (Latin + Tamil, comma separated)</label><input type="text" name="aliases"></div>
+        <div><label>File (.md / .txt)</label><input type="file" name="file" accept=".md,.txt" required></div>
+        <div style="align-self:end"><button class="btn">Upload & re-index</button> <span class="small" id="kbmsg"></span></div>
+      </form>
+      <h2 style="margin-top:16px">Documents</h2><div class="overflow"><table id="docs"></table></div>
+    </section>
+
+    <section class="card" style="margin-top:12px"><h2>Recent turns</h2>
+      <div class="overflow"><table id="turns"></table></div></section>
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let KEY=""; try{KEY=sessionStorage.getItem("kural_admin")||"";}catch(e){}
+const H=()=>({"X-Admin-Key":KEY});
+async function get(u){const r=await fetch(u,{headers:H()}); if(r.status===401) throw new Error("bad key"); return r.json();}
+const ts=t=>new Date(t*1000).toLocaleString();
+
+async function load(){
+  const d=$("#days").value;
+  const [a,turns,tix,docs]=await Promise.all([get(`/api/v1/admin/analytics?days=${d}`),get("/api/v1/admin/turns?limit=25"),get("/api/v1/admin/tickets"),fetch("/api/v1/schemes").then(r=>r.json())]);
+  const k=[["Turns",a.turns],["Avg latency",a.avg_latency_ms!=null?a.avg_latency_ms+" ms":"–"],["p95 latency",a.p95_latency_ms!=null?a.p95_latency_ms+" ms":"–"],
+    ["Avg confidence",a.avg_confidence??"–"],["Escalations",a.escalations],["Noisy calls",a.noisy_calls],["Avg SNR",a.avg_snr_db!=null?a.avg_snr_db+" dB":"–"],
+    ["Evon fallbacks",a.llm_fallbacks],["Feedback",a.feedback.n?`${a.feedback.avg} (${a.feedback.n})`:"–"],["Open tickets",a.open_tickets],["KB chunks",a.kb_chunks],["Errors",a.errors]];
+  $("#kpis").innerHTML=k.map(([n,v])=>`<div class="card kpi"><div class="v">${esc(v)}</div><div class="k">${n}</div></div>`).join("");
+  const mx=Math.max(1,...a.daily.map(x=>x.n));
+  $("#daily").innerHTML=a.daily.length?a.daily.map(x=>`<div style="height:${100*x.n/mx}%" title="${x.n}"><span>${x.d.slice(5)}</span></div>`).join(""):'<p class="small">No calls yet</p>';
+  const c=a.credits, pct=Math.min(100,100*c.used/c.budget);
+  $("#credits").innerHTML=`<div class="meter"><i style="width:${pct}%;${c.alert?'background:var(--bad)':''}"></i></div>
+    <p class="small">${c.used} of ${c.budget} estimated credits used · ${c.remaining} left ${c.alert?'<b class="warn">— over alert threshold</b>':''}</p>`;
+  $("#langs").innerHTML=a.by_language.map(x=>`${esc(x.language)}: <b>${x.n}</b>`).join(" · ")+"<br>"+a.by_channel.map(x=>`${esc(x.channel)}: <b>${x.n}</b>`).join(" · ");
+  $("#gaps").innerHTML="<tr><th>When</th><th>Question</th></tr>"+(a.knowledge_gaps.map(g=>`<tr><td>${ts(g.created_at)}</td><td>${esc(g.transcript)}</td></tr>`).join("")||'<tr><td colspan=2 class="small">None 🎉</td></tr>');
+  $("#tickets").innerHTML="<tr><th>Ticket</th><th>Lang</th><th>Question</th><th>Created</th><th></th></tr>"+(tix.map(t=>`<tr><td>${esc(t.id)}</td><td>${esc(t.language)}</td><td>${esc(t.transcript)}</td><td>${ts(t.created_at)}</td><td><button class="btn ghost" data-t="${esc(t.id)}">Close</button></td></tr>`).join("")||'<tr><td colspan=5 class="small">No open tickets</td></tr>');
+  document.querySelectorAll("[data-t]").forEach(b=>b.onclick=async()=>{await fetch(`/api/v1/admin/tickets/${b.dataset.t}/close`,{method:"POST",headers:H()});load();});
+  $("#docs").innerHTML="<tr><th>ID</th><th>Title</th><th>Category</th><th>Source</th></tr>"+docs.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.title)}</td><td>${esc(x.category)}</td><td><a href="${esc(x.source_url)}" target="_blank" rel="noopener">${esc(x.source_url)}</a></td></tr>`).join("");
+  $("#turns").innerHTML="<tr><th>When</th><th>Ch</th><th>Lang</th><th>Question</th><th>Answer</th><th>Conf</th><th>ms</th></tr>"+turns.map(t=>`<tr><td>${ts(t.created_at)}</td><td>${esc(t.channel)}</td><td>${esc(t.language)}</td><td>${esc(t.transcript)}</td><td>${esc(t.answer)}</td><td>${esc(t.confidence)}</td><td>${esc(t.total_ms)}</td></tr>`).join("");
+  $("#updated").textContent="Updated "+new Date().toLocaleTimeString();
+}
+async function open(){ try{ await load(); $("#login").classList.add("hidden"); $("#dash").classList.remove("hidden"); }
+  catch(e){ $("#lerr").textContent="Invalid key"; $("#login").classList.remove("hidden"); $("#dash").classList.add("hidden"); } }
+$("#lform").onsubmit=e=>{e.preventDefault();KEY=$("#key").value;try{sessionStorage.setItem("kural_admin",KEY);}catch(e){} open();};
+$("#logout").onclick=()=>{KEY="";try{sessionStorage.removeItem("kural_admin");}catch(e){} location.reload();};
+$("#refresh").onclick=load; $("#days").onchange=load;
+$("#kb").onsubmit=async e=>{e.preventDefault(); $("#kbmsg").textContent="Uploading…";
+  const r=await fetch("/api/v1/admin/kb/upload",{method:"POST",headers:H(),body:new FormData(e.target)}); const j=await r.json();
+  $("#kbmsg").textContent=r.ok?`Indexed ✓ (${j.chunks_total} chunks)`:(j.error?.message||"Failed"); if(r.ok){e.target.reset();load();}};
+if(KEY) open();
+setInterval(()=>{ if(!$("#dash").classList.contains("hidden")) load().catch(()=>{}); },30000);
+</script>
+</body>
+</html>

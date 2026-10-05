@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ta">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kural · குரல் — Tamil voice helpline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;600;700&family=Noto+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="brand"><h1>Kural</h1><span>குரல்</span></div>
+      <p class="tag">அரசு திட்டங்கள் பற்றி தமிழில் பேசிக் கேளுங்கள் · Ask about government schemes in Tamil, Tanglish or English</p>
+    </div>
+    <span class="pill" id="status">● connecting…</span>
+  </header>
+
+  <section class="card">
+    <div class="controls">
+      <div>
+        <div class="row">
+          <div style="flex:1;min-width:160px">
+            <label for="lang">மொழி / Language</label>
+            <select id="lang">
+              <option value="ta-IN" selected>தமிழ் (Tamil / Tanglish)</option>
+              <option value="en-IN">English</option>
+              <option value="hi-IN">हिन्दी (Hindi)</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <label class="toggle"><input type="checkbox" id="phone"> 📞 Phone-line mode (noisy 8 kHz)</label>
+            <div class="row small"><span>SNR</span><input type="range" id="snr" min="0" max="25" value="10" style="flex:1"><span id="snrv">10 dB</span></div>
+          </div>
+        </div>
+        <form id="tform" class="row" style="margin-top:12px">
+          <input type="text" id="text" placeholder="அல்லது இங்கே தட்டச்சு செய்யுங்கள் / or type here…" style="flex:1;min-width:200px" autocomplete="off">
+          <button class="btn" type="submit">Ask</button>
+        </form>
+        <div class="chips" id="chips"></div>
+      </div>
+      <button class="mic" id="mic" aria-label="Hold to record">
+        <span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg><br><span id="micl">பேசுங்கள்</span></span>
+      </button>
+    </div>
+  </section>
+
+  <div class="thread" id="thread" aria-live="polite"></div>
+
+  <footer>
+    Built on Gnani AI — <b>Prisma</b> speech-to-text · <b>Evon</b> reasoning · <b>Timbre</b> text-to-speech ·
+    <a href="/docs">API</a> · <a href="/admin">Admin</a><br>
+    Demo data only — please don't share real Aadhaar, phone or bank numbers. Verify scheme details on official sites.
+  </footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let sessionId = null, rec = null, chunks = [], recording = false;
+const SAMPLES = {
+  "ta-IN": ["பிஎம் கிசான் திட்டத்தில் எவ்வளவு பணம் கிடைக்கும்?", "மகளிர் உரிமைத் தொகை யாருக்கு கிடைக்கும்?", "PM Kisan panam varala, enna pannanum?", "பயிர் சேதம் ஆனால் எத்தனை மணி நேரத்தில் புகார் செய்ய வேண்டும்?"],
+  "en-IN": ["How much does PM-KISAN pay?", "Who is eligible for CMCHIS health insurance?", "What is the interest rate on Kisan Credit Card?"],
+  "hi-IN": ["पीएम किसान में कितना पैसा मिलता है?", "फसल बीमा का प्रीमियम कितना है?"],
+};
+function renderChips(){ const l=$("#lang").value; $("#chips").innerHTML="";
+  (SAMPLES[l]||[]).forEach(t=>{const b=document.createElement("button");b.className="chip";b.type="button";b.textContent=t;b.onclick=()=>ask(t);$("#chips").append(b);});}
+$("#lang").onchange=renderChips; renderChips();
+$("#snr").oninput=e=>$("#snrv").textContent=e.target.value+" dB";
+
+fetch("/readyz").then(r=>r.json()).then(j=>{
+  const c=j.checks||{}; $("#status").textContent = j.ready ? "● ready" : "● not ready";
+  $("#status").title = Object.entries(c).map(([k,v])=>`${k}: ${v}`).join("\n");
+  $("#status").className="pill "+(j.ready?"ok":"warn");
+}).catch(()=>{$("#status").textContent="● offline";});
+
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function bubbleQ(text){const d=document.createElement("div");d.className="q";d.textContent=text;$("#thread").append(d);return d;}
+function bubbleA(html){const d=document.createElement("div");d.className="a card";d.innerHTML=html;$("#thread").append(d);d.scrollIntoView({behavior:"smooth",block:"end"});return d;}
+
+function renderAnswer(r, el){
+  const t=r.timings_ms||{}, total=t.total||1;
+  const seg=[["preprocess","#a8a29e"],["stt","#2563eb"],["retrieve","#7c3aed"],["llm","#c2410c"],["tts","#15803d"]];
+  const bars=seg.filter(([k])=>t[k]).map(([k,c])=>`<i style="width:${100*t[k]/total}%;background:${c}" title="${k} ${t[k]}ms"></i>`).join("");
+  const legend=seg.filter(([k])=>t[k]).map(([k,c])=>`<span><b style="background:${c}"></b>${k} ${t[k]}ms</span>`).join("")+`<span>total ${total}ms</span>`;
+  const src=(r.sources||[]).map(s=>`<a class="src" href="${esc(s.url)}" target="_blank" rel="noopener">📄 ${esc(s.title)}</a>`).join("");
+  const ai=r.audio_info?`<span class="pill">🎙 ${r.audio_info.duration_s}s · SNR ${r.audio_info.snr_db} dB ${r.audio_info.noisy?'<span class="warn">noisy</span>':''}</span>`:"";
+  const flags=[r.code_mixed?'<span class="pill">Tanglish detected</span>':"", r.fallback&&!r.escalated?'<span class="pill" title="Answer read directly from the source document (LLM unavailable)">📄 read from official document</span>':"",
+    r.escalated?`<span class="pill warn">Escalated · ${esc(r.ticket)}</span>`:"", r.pii_redacted?.length?`<span class="pill">🔒 redacted ${r.pii_redacted.join(", ")}</span>`:""].join("");
+  el.innerHTML=`<div class="ans">${esc(r.answer)}</div>
+    ${r.audio_b64?`<audio controls autoplay src="data:${r.audio_content_type};base64,${r.audio_b64}" style="width:100%;margin-top:10px"></audio>`:""}
+    <div class="meta">${src}</div>
+    <div class="lat">${bars}</div><div class="legend">${legend}</div>
+    <div class="meta">${ai}${flags}<span class="pill">confidence ${r.confidence}</span>
+      <span class="fb"><button data-r="1" title="Helpful">👍</button><button data-r="-1" title="Not helpful">👎</button></span></div>`;
+  el.querySelectorAll(".fb button").forEach(b=>b.onclick=async()=>{
+    await fetch("/api/v1/feedback",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({turn_id:r.turn_id,rating:+b.dataset.r})});
+    el.querySelector(".fb").innerHTML='<span class="small ok">நன்றி · thanks!</span>';});
+}
+async function handle(resp, el){
+  const j=await resp.json();
+  if(!resp.ok){el.innerHTML=`<span class="warn">⚠ ${esc(j.error?.message||"Error")}</span>`;return;}
+  sessionId=j.session_id; const qb=el.previousSibling; if(j.transcript && qb?.classList.contains("q") && qb.dataset.voice) qb.textContent="🎙 "+j.transcript;
+  renderAnswer(j, el);
+}
+async function ask(text){
+  bubbleQ(text); const el=bubbleA('<span class="small">யோசிக்கிறேன்… thinking…</span>');
+  try{ await handle(await fetch("/api/v1/query/text",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({text,language:$("#lang").value,session_id:sessionId,speak:true})}), el);}
+  catch(e){el.innerHTML='<span class="warn">Network error</span>';}
+}
+$("#tform").onsubmit=e=>{e.preventDefault();const t=$("#text").value.trim();if(t){$("#text").value="";ask(t);}};
+
+async function startRec(){
+  try{ const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false}});
+    rec=new MediaRecorder(stream); chunks=[];
+    rec.ondataavailable=e=>chunks.push(e.data);
+    rec.onstop=()=>{stream.getTracks().forEach(t=>t.stop()); send(new Blob(chunks,{type:rec.mimeType}));};
+    rec.start(); recording=true; $("#mic").classList.add("rec"); $("#micl").textContent="நிறுத்த";
+    setTimeout(()=>recording&&stopRec(),60000);
+  }catch(e){alert("Microphone permission needed / மைக் அனுமதி தேவை");}
+}
+function stopRec(){ if(rec&&recording){recording=false;rec.stop();$("#mic").classList.remove("rec");$("#micl").textContent="பேசுங்கள்";} }
+$("#mic").onclick=()=>recording?stopRec():startRec();
+
+async function send(blob){
+  const q=bubbleQ("🎙 …"); q.dataset.voice="1"; const el=bubbleA('<span class="small">கேட்கிறேன்… listening…</span>');
+  const fd=new FormData(); fd.append("audio",blob,"speech.webm"); fd.append("language",$("#lang").value);
+  if(sessionId) fd.append("session_id",sessionId);
+  fd.append("simulate_phone",$("#phone").checked); fd.append("simulate_snr_db",$("#snr").value);
+  $("#mic").disabled=true;
+  try{ await handle(await fetch("/api/v1/query/voice",{method:"POST",body:fd}), el);}
+  catch(e){el.innerHTML='<span class="warn">Network error</span>';}
+  finally{$("#mic").disabled=false;}
+}
+</script>
+</body>
+</html>
