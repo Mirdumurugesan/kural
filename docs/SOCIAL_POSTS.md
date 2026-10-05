@@ -1,7 +1,7 @@
 # Build-in-public posts
 
 Selection weighs engagement on your nominated posts, so post progress weekly and save the big demo for the final week.
-Always include **#GnaniAI #GreatIndianAIInternshipChallenge** and tag @Gnani AI.
+Always include **#GnaniAI #GreatIndianAIInternshipChallenge** and **tag Gnani AI's official account** (LinkedIn: type @Gnani.ai and pick the company page; X: @GnaniAi). Tagging alone doesn't complete the entry: nominate the post in your submission.
 
 ---
 

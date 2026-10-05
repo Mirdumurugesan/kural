@@ -66,8 +66,9 @@ class Settings(BaseSettings):
 
     # ---- credit guard (programme gives 5,000 credits) ----
     credit_budget: float = 5000.0
-    credit_cost_stt_per_min: float = 1.0
-    credit_cost_tts_per_1k_chars: float = 1.0
+    # from app.gnani.ai/voice/pricing (Oct 2026): STT 27 credits/hour, TTS 27 credits per 10k chars
+    credit_cost_stt_per_min: float = 0.45
+    credit_cost_tts_per_1k_chars: float = 2.7
     credit_alert_ratio: float = 0.8
 
     # ---- telephony ----
