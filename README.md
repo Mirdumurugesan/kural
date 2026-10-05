@@ -1,5 +1,9 @@
 # Kural · குரல்
 
+[![ci](https://github.com/Mirdumurugesan/kural/actions/workflows/ci.yml/badge.svg)](https://github.com/Mirdumurugesan/kural/actions/workflows/ci.yml)
+
+▶️ **60-second demo:** [`demo/kural_demo_60s.mp4`](demo/kural_demo_60s.mp4) · 📊 **Live benchmarks:** [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)
+
 **A Tamil-first voice helpline for government schemes, built on Gnani AI's own models.**
 A farmer, a woman head of family or a college student calls (or taps the mic) and asks in Tamil, Tanglish or English:
 *"PM Kisan panam varala, enna pannanum?"* Kural listens through a noisy phone line, finds the answer in verified

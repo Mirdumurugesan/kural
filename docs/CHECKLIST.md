@@ -23,7 +23,7 @@
 1. [x] Live smoke test passed (Timbre → Prisma round trip). Still to do: check credit usage on the Gnani dashboard and set `CREDIT_COST_*` in `.env` to match.
 2. [ ] Ask on Discord whether there's a hosted Evon endpoint. Otherwise set one up (README › Hosting Evon).
 3. [x] Noise benchmark run (`docs/BENCHMARKS.md`); numbers are already in the Week 3 post.
-4. [ ] Push to GitHub (public repo). CI runs the tests automatically.
+4. [x] Public repo: https://github.com/Mirdumurugesan/kural (CI green). Run `push_to_github.bat` after any change.
 5. [ ] Fill in the workspace from `docs/SUBMISSION.md`.
 6. [ ] Post weekly (`docs/SOCIAL_POSTS.md`); post `demo/kural_demo_60s.mp4` in the final week (re-record after Evon is connected if possible).
 7. [ ] Submit by Nov 6 with links to the video and the nominated posts.

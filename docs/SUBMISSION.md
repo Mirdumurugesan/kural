@@ -47,7 +47,7 @@ Solo Ninja · Small Town, Big Build (Coimbatore) · Demo Day Drop (60-second vid
 the Tamil-on-noisy-phone story.
 
 ## Links to fill in
-- Demo video: `<YouTube / LinkedIn video URL>`
+- Demo video: `<LinkedIn/X video URL>` (file: `demo/kural_demo_60s.mp4`)
 - LinkedIn post: `<url>`
 - X post: `<url>`
-- Code: `<GitHub repo URL>`
+- Code: https://github.com/Mirdumurugesan/kural
